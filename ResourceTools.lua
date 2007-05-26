@@ -57,8 +57,6 @@ CPU Profiling
 function RT:CheckEvents( event )
 	if( not RTEvents[ event ] ) then
 		RTEvents[ event ] = true;
-		
-		self:UpdateEventList();
 	end
 end
 
