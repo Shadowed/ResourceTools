@@ -1,0 +1,12 @@
+## Interface: 20100
+## Title: Resource Tools
+## Notes: Addon for developers to assist with profiling addons
+## SavedVariables: ResourceToolsDB, RTEvents
+
+Dongle.lua
+
+localization.enUS.lua
+localization.deDE.lua
+localization.frFR.lua
+
+ResourceTools.lua
