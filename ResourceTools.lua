@@ -1,4 +1,4 @@
-RT = DongleStub("Dongle-1.0"):New( "ResourceTools" );
+RT = DongleStub("Dongle-1.0"):New( "RT" );
 
 local L = ResourceToolsLocals;
 
@@ -9,13 +9,13 @@ function RT:Enable()
 	}
 	
 	self.db = self:InitializeDB( "ResourceToolsDB", self.defaults )
-	self.cmd = self:InitializeSlashCommand( L["RT Slash Commands"], "ResourceTools", "resourcetools", "rt" );
+	self.cmd = self:InitializeSlashCommand( L["ResourceTools Slash Commands"], "ResourceTools", "resourcetools", "rt" );
 	self.cmd:RegisterSlashHandler( L["/rt mem <name> - Lists memory usage of the specified addon"], "mem (%S+)", "GetMemUsage" );	
 	self.cmd:RegisterSlashHandler( L["/rt cpu - Toggles CPU usage on and off"], "cpu", "ToggleCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt reset - Resets CPU stats"], "reset", "ResetCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt total <addon> - Total CPU usage of the specified addon"], "total (%S+)", "GetTotalCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt func <name> <true/false> - CPU usage on the specified function, second argument is to include subroutines."], "func (%S+) (%S+)", "GetFunctionCPU" );
-	self.cmd:RegisterSlashHandler( L["/rt event <name> or all - Event names to register CPU usage for, you can specify multiple ones with a comma, or use \"all\" for a total based on all events."], "event (%S+)", "GetEventCPU" );
+	self.cmd:RegisterSlashHandler( L["/rt event <name> or all - Event names to register CPU usage for, you can specify multiple ones with a comma, or use \"all\" for a total based on all events."], "event (.+)", "GetEventCPU" );
 	
 	
 	if( not RTEvents ) then
@@ -98,7 +98,7 @@ function RT:GetTotalCPU( addon )
 	end
 
 	UpdateAddOnCPUUsage();
-	self:Print( string.format( L["%s: %.3f seconds."], addon, GetAddOnCPUUsage( addon ) ) );
+	self:Echo( string.format( L["%s: %.3f seconds."], addon, GetAddOnCPUUsage( addon ) ) );
 end
 
 function RT:GetFunctionCPU( text, includeSub )
@@ -118,7 +118,7 @@ function RT:GetFunctionCPU( text, includeSub )
 		includeSub = nil;
 	end
 	
-	if( string.match( text, "." ) ) then
+	if( string.match( text, "%." ) ) then
 		local namespaceName, func = string.split( ".", text );
 		local namespace = getglobal( namespaceName );
 		
@@ -132,36 +132,52 @@ function RT:GetFunctionCPU( text, includeSub )
 		
 		
 		local seconds, called = GetFunctionCPUUsage( namespace[ func ], includeSub );
-		
-		self:Print( string.format( L["%s (subroutines %s) took %.3f seconds, called %d times."], text, usedSubs, seconds, called ) );
+
+		if( called > 0 ) then
+			self:Print( string.format( L["%s (subroutines %s) took %.3f seconds, called %d times, average %.3f."], text, usedSubs, seconds, called, seconds / called ) );
+		else
+			self:Print( string.format( L["%s, no function calls found."], text ) );
+		end
 	else
-		local seconds, called = GetFunctionCPUUsage( getglobal( text ), includeSub );
+		local func = getglobal( text );
+		if( not func ) then
+			self:Print( string.format( L["Cannot find the function %s."], text ) );
+			return;
+		end
 		
-		self:Print( string.format( L["%s (subroutines %s) took %.3f seconds, called %d times."], text, usedSubs, seconds, called ) );
+		local seconds, called = GetFunctionCPUUsage( func, includeSub );
+
+		if( called > 0 ) then
+			self:Print( string.format( L["%s (subroutines %s) took %.3f seconds, called %d times, average %.3f."], text, usedSubs, seconds, called, seconds / called ) );
+		else
+			self:Print( string.format( L["%s, no function calls found."], text ) );
+		end
 	end
 end
 
-function RT:GetEventCPU( event )
+function RT:GetEventCPU( text )
 	if( GetCVar( "scriptProfile" ) == "0" ) then
 		self:Print( L["You have to enable CPU profiling first before you can use this."] );
 		return;
 	end
-	
+		
 	UpdateAddOnCPUUsage();
 	
-	local time, called;
+	local seconds, called;
 
-	if( event ~= "all" ) then
-		local events = { string.split( ",", event ) };
-
-		for _, event in pairs( events ) do
-			time, called = GetEventCPUUsage( event );
+	if( text ~= "all" ) then
+		for _, event in pairs( { string.split( ",", ( string.gsub( text, " ", "" ) ) ) } ) do
+			seconds, called = GetEventCPUUsage( event );
 			
-			self:Print( string.format( L["%s: %.3f seconds, called %d times."], event, time, called ) );
+			if( called > 0 ) then
+				self:Echo( string.format( L["%s: %.3f seconds, called %d times, %.3f average."], event, seconds, called, seconds / called ) );
+			else
+				self:Echo( string.format( L["%s: no events by this name have been triggered."], event ) );
+			end
 		end
 	else
-		time, called = GetEventCPUUsage();
+		seconds, called = GetEventCPUUsage();
 		
-		self:Print( string.format( L["%s: %.3f seconds, called %d times."], L["All Events"], time, called ) );
+		self:Echo( string.format( L["%s: %.3f seconds, called %d times, %.3f average."], L["All Events"], seconds, called, seconds / called ) );
 	end
 end
