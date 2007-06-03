@@ -660,14 +660,8 @@ function RT:ShowNamespaceProfile()
 		column4 = getglobal( self.extrasFrame:GetName() .. "SortRow" .. i .. "Column4" );
 		
 		if( index <= #( funcList ) ) then
-			if( string.len( funcList[ index ].name ) >= 30 ) then
-				funcList[ index ].name = string.sub( funcList[ index ].name, 15 );
-
-				if( string.sub( funcList[ index ].name, 0, 1 ) == "_" ) then
-					funcList[ index ].name = string.sub( funcList[ index ].name, 2 );
-				end
-				
-				funcList[ index ].name = "..." .. funcList[ index ].name;
+			if( string.len( funcList[ index ].name ) >= 36 ) then
+				funcList[ index ].name = string.sub( funcList[ index ].name, 0, 36 ) .. "...";
 			end
 			
 			column1:SetText( funcList[ index ].name );
