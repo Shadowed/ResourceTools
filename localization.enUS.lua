@@ -50,6 +50,7 @@ ResourceToolsLocals = {
 	["No events found."] = "No events found.",
 	["Filter Used: \"%s\""] = "Filter Used: \"%s\"",
 	
+	["Hide injected functions"] = "Hide injected functions",
 	["Hide uncalled events"] = "Hide uncalled events",
 	["Hide uncalled functions"] = "Hide uncalled functions",
 	["Include subroutines"] = "Include subroutines",
@@ -66,6 +67,10 @@ ResourceToolsLocals = {
 	["All Events"] = "All Events",
 	["%s: no events by this name have been triggered."] = "%s: no events by this name have been triggered.",
 	["%s: %.3f seconds."] = "%s: %.3f seconds.",
+	
+	["No calls made to the frame %s."] = "No calls made to the frame %s.",
+	["Cannot find the frame %s."] = "Cannot find the frame %s.",
+	["%s (children %s) took %.3f seconds, called %d times, average %.3f."] = "%s (children %s) took %.3f seconds, called %d times, average %.3f.",
 	
 	["All CPU profiling statistics have been reset."] = "All CPU profiling statistics have been reset.",
 	["You have to enable CPU profiling first before you can use this."] = "You have to enable CPU profiling first before you can use this.",

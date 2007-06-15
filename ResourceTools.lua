@@ -10,6 +10,7 @@ function RT:Enable()
 	self.defaults = {
 		profile = {
 			includeSub = true,
+			hideInjected = true,
 			hideZeroFuncs = true,
 			hideZeroEvents = true,
 			searchName = "",
@@ -25,7 +26,7 @@ function RT:Enable()
 	self.cmd:RegisterSlashHandler( L["/rt cpu - Toggles CPU usage on and off"], "cpu", "ToggleCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt reset - Resets CPU stats"], "reset", "ResetCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt total <addon> - Total CPU usage of the specified addon"], "total (%S+)", "GetTotalCPU" );
-	--self.cmd:RegisterSlashHandler( L["/rt frame <name> <true/false> - CPU usage on the specified frame, second argument is to include children"], "frame (%S+) (%S+)", "GetFrameCPU" );
+	self.cmd:RegisterSlashHandler( L["/rt frame <name> <true/false> - CPU usage on the specified frame, second argument is to include children"], "frame (%S+) (%S+)", "GetFrameCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt func <name> <true/false> - CPU usage on the specified function, second argument is to include subroutines."], "func (%S+) (%S+)", "GetFunctionCPU" );
 	self.cmd:RegisterSlashHandler( L["/rt event <name> or all - Event names to register CPU usage for, you can specify multiple ones with a comma, or use \"all\" for a total based on all events."], "event (.+)", "GetEventCPU" );
 	
@@ -38,6 +39,32 @@ function RT:Enable()
 			RTEvents[" _OnUpdate"] = nil;
 			RTEvents[" _Start"] = nil;
 		end
+	end
+	
+	if( not RTBlacklist ) then
+		RTBlacklist = {};
+		RTBlacklist["RegisterEvent"] = true;
+		RTBlacklist["UnregisterEvent"] = true;
+		RTBlacklist["UnregisterAllEvents"] = true;
+		RTBlacklist["IsEventRegistered"] = true;
+		RTBlacklist["RegisterMessage"] = true;
+		RTBlacklist["UnregisterMessage"] = true;
+		RTBlacklist["UnregisterAllMessages"] = true;
+		RTBlacklist["TriggerMessage"] = true;
+		RTBlacklist["IsMessageRegistered"] = true;
+		RTBlacklist["EnableDebug"] = true;
+		RTBlacklist["IsDebugEnabled"] = true;
+		RTBlacklist["Print"] = true;
+		RTBlacklist["PrintF"] = true;
+		RTBlacklist["Debug"] = true;
+		RTBlacklist["DebugF"] = true;
+		RTBlacklist["Echo"] = true;
+		RTBlacklist["EchoF"] = true;
+		RTBlacklist["InitializeDB"] = true;
+		RTBlacklist["InitializeSlashCommand"] = true;
+		RTBlacklist["NewModule"] = true;
+		RTBlacklist["HasModule"] = true;
+		RTBlacklist["IterateModules"] = true;
 	end
 	
 	if( not self.eventFrame ) then
@@ -79,6 +106,12 @@ function RT:Disable()
 			self.db.profile.hideZeroEvents = false;		
 		else
 			self.db.profile.hideZeroEvents = true;
+		end
+		
+		if( not self.nsHideInject:GetChecked() ) then
+			self.db.profile.hideInjected = false;
+		else
+			self.db.profile.hideInjected = true;	
 		end
 	end
 end
@@ -273,15 +306,24 @@ function RT:CreateUI()
 	self.nsHideZero:SetScript( "OnClick", self.ShowNamespaceProfile );
 	getglobal( self.nsHideZero:GetName() .. "Text" ):SetText( L["Hide uncalled functions"] );
 
+	self.nsHideInject = CreateFrame( "CheckButton", self.frame:GetName() .. "NamespaceInject", self.frame, "OptionsCheckButtonTemplate" );
+	self.nsHideInject:SetHeight( 26 );
+	self.nsHideInject:SetWidth( 26 );
+	self.nsHideInject:SetPoint( "TOPLEFT", self.nsHideZero, "TOPLEFT", 0, -20 );
+	self.nsHideInject:SetChecked( self.db.profile.hideInjected );
+	self.nsHideInject.blockShow = self.nsHideInject:GetChecked();
+	self.nsHideInject:SetScript( "OnClick", self.ShowNamespaceProfile );
+	getglobal( self.nsHideInject:GetName() .. "Text" ):SetText( L["Hide injected functions"] );
+		
 	-- Event profiling
 	self.eventText = self.frame:CreateFontString( self.frame:GetName() .. "Event", "BACKGROUND" );
 	self.eventText:SetFont( ( GameFontNormalSmall:GetFont() ), 13 );
 	self.eventText:SetTextColor( 1, 1, 1 );
-	self.eventText:SetPoint( "TOPLEFT", self.nsHideZero, "TOPLEFT", 0, -36 );
+	self.eventText:SetPoint( "TOPLEFT", self.nsHideInject, "TOPLEFT", 0, -36 );
 	self.eventText:SetText( L["Event Profiling"] );
 	
 	self.eventView = CreateFrame( "Button", self.frame:GetName() .. "ViewEvent",  self.frame, "UIPanelButtonGrayTemplate" );
-	self.eventView:SetPoint( "TOPRIGHT", self.namespaceView, "TOPRIGHT", 0, -135 );
+	self.eventView:SetPoint( "TOPRIGHT", self.namespaceView, "TOPRIGHT", 0, -155 );
 	self.eventView:SetText( L["View"] );
 	self.eventView:SetWidth( 75 );
 	self.eventView:SetHeight( 18 );
@@ -621,7 +663,7 @@ function RT:ShowNamespaceProfile()
 	local seconds, called;
 
 	for key, value in pairs( namespace ) do
-		if( type( value ) == "function" and ( ( searchFilter and string.find( key, searchFilter ) ) or not searchFilter ) ) then
+		if( type( value ) == "function" and ( ( self.nsHideInject:GetChecked() and not RTBlacklist[ key ] ) or not self.nsHideInject:GetChecked() ) and ( ( searchFilter and string.find( key, searchFilter ) ) or not searchFilter ) ) then
 			seconds, called = GetFunctionCPUUsage( namespace[ key ], self.namespaceSubs:GetChecked() );	
 			
 			if( ( self.nsHideZero:GetChecked() and called > 0 ) or not self.nsHideZero:GetChecked() ) then
@@ -870,7 +912,31 @@ function RT:GetFrameCPU( text, includeChildren )
 		self:Print( L["You have to enable CPU profiling first before you can use this."] );
 		return;
 	end
-
+	
+	UpdateAddOnCPUUsage();
+	
+	local usedChild;
+	if( includeChildren == "true" ) then
+		usedChild = L["included"];
+		includeChildren = true;
+	else
+		usedChild = L["skipped"];
+		includeChildren = nil;
+	end
+	
+	local frame = getglobal( text );
+	if( not frame ) then
+		self:Print( string.format( L["Cannot find the frame %s."], text ) );
+		return;
+	end
+	
+	local seconds, called = GetFrameCPUUsage( frame, includeChildren );
+	
+	if( called > 0 ) then
+		self:Print( string.format( L["%s (children %s) took %.3f seconds, called %d times, average %.3f."], text, usedChild, seconds, called, seconds / called ) );
+	else
+		self:Print( string.format( L["No calls made to the frame %s."], text ) );
+	end
 end
 
 function RT:GetFunctionCPU( text, includeSub )
