@@ -3,7 +3,6 @@
 ## Notes: Addon for developers to assist with profiling addons
 ## SavedVariables: ResourceToolsDB, RTEvents, RTBlacklist
 
-Dongle.lua
 
 localization.enUS.lua
 localization.deDE.lua

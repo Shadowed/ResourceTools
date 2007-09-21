@@ -42,6 +42,8 @@ ResourceToolsLocals = {
 	["View"] = "View",
 	["Search"] = "Search",
 	["None"] = "None",
+	["MIR"] = "Mem/Sec",
+	["CIR"] = "CPU/Sec",
 	
 	["You do not have CPU profiling on, or didn't reloadui."] = "You do not have CPU profiling on, or didn't reloadui.",
 	["No namespace called \"%s\" seems to exist."] = "No namespace called \"%s\" seems to exist.",
