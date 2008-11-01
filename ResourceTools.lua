@@ -6,52 +6,9 @@ local ScriptProfiling
 local TOTAL_SCROLL_ROWS = 15
 local TOTAL_COLUMNS = 5
 
-local cmdPatterns = {
-	["mem (%S+)"] = "GetMemUsage",
-	["ui"] = "ToggleUI",
-	["cpu"] = "ToggleCPU",
-	["reset"] = "ResetCPU",
-	["total (%S+)"] = "GetTotalCPU",
-	["frame (%S+) (%S+)"] = "GetFrameCPU",
-	["func (%S+) (%S+)"] = "GetFunctionCPU",
-	["event (.+)"] = "GetEventCPU",
-}
-
-local function SlashParser(cmd)
-	if cmd ~= "" then
-		for regEx, method in pairs(cmdPatterns) do
-			if cmd:match(regEx) then
-				RT[method](RT, cmd:match(regEx))
-				return
-			end
-		end
-	end
-	
-	ChatFrame1:AddMessage( L["ResourceTools Slash Commands"])
-	ChatFrame1:AddMessage( L["/rt mem <name> - Lists memory usage of the specified addon"])
-	ChatFrame1:AddMessage( L["/rt ui - Toggles the profiling UI"]  )
-	ChatFrame1:AddMessage( L["/rt cpu - Toggles CPU usage on and off"] )
-	ChatFrame1:AddMessage( L["/rt reset - Resets CPU stats"] )
-	ChatFrame1:AddMessage( L["/rt total <addon> - Total CPU usage of the specified addon"] )
-	ChatFrame1:AddMessage( L["/rt frame <name> <true/false> - CPU usage on the specified frame, second argument is to include children"])
-	ChatFrame1:AddMessage( L["/rt func <name> <true/false> - CPU usage on the specified function, second argument is to include subroutines."])
-	ChatFrame1:AddMessage( L["/rt event <name> or all - Event names to register CPU usage for, you can specify multiple ones with a comma, or use \"all\" for a total based on all events."] )
-	
-end
-
-function RT:Load()
-	local frame = CreateFrame("Frame")
-	frame:SetScript("OnEvent", function(frame,event,...) self[event](self,...) end)
-	frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-	frame:RegisterEvent("PLAYER_LOGOUT")
-	self.frame = frame
-end
-
-function RT:PLAYER_ENTERING_WORLD()
-
+function RT:OnInitialize()
 	self.defaults = {
 		includeSub = true,
-		hideInjected = true,
 		hideZeroFuncs = true,
 		hideZeroEvents = true,
 		searchName = "",
@@ -59,10 +16,8 @@ function RT:PLAYER_ENTERING_WORLD()
 		searchEvent = "",
 	}
 	
-	if not ResourceToolsDB then ResourceToolsDB = {} end
+	ResourceToolsDB = ResourceToolsDB or {}
 	self.db = setmetatable(ResourceToolsDB, {__index=function(t,k) return self.defaults[k] end})
-	SlashCmdList["RESOURCETOOLS"] = SlashParser
-	SLASH_RESOURCETOOLS1 = "/rt"
 	
 	if( not RTEvents ) then
 		RTEvents = {}
@@ -73,47 +28,6 @@ function RT:PLAYER_ENTERING_WORLD()
 			RTEvents[" _OnUpdate"] = nil
 			RTEvents[" _Start"] = nil
 		end
-	end
-	
-	if( not RTBlacklist ) then
-		RTBlacklist = {}
-		RTBlacklist["RegisterEvent"] = true
-		RTBlacklist["UnregisterEvent"] = true
-		RTBlacklist["UnregisterAllEvents"] = true
-		RTBlacklist["IsEventRegistered"] = true
-		RTBlacklist["RegisterMessage"] = true
-		RTBlacklist["UnregisterMessage"] = true
-		RTBlacklist["UnregisterAllMessages"] = true
-		RTBlacklist["TriggerMessage"] = true
-		RTBlacklist["IsMessageRegistered"] = true
-		RTBlacklist["EnableDebug"] = true
-		RTBlacklist["IsDebugEnabled"] = true
-		RTBlacklist["Print"] = true
-		RTBlacklist["PrintF"] = true
-		RTBlacklist["Debug"] = true
-		RTBlacklist["DebugF"] = true
-		RTBlacklist["Echo"] = true
-		RTBlacklist["EchoF"] = true
-		RTBlacklist["InitializeDB"] = true
-		RTBlacklist["InitializeSlashCommand"] = true
-		RTBlacklist["NewModule"] = true
-		RTBlacklist["HasModule"] = true
-		RTBlacklist["IterateModules"] = true
-		RTBlacklist["RegisterCategory"] = true
-		RTBlacklist["RegisterSubCategory"] = true
-		RTBlacklist["RemoveCategory"] = true
-		RTBlacklist["RemoveSubCategory"] = true
-		RTBlacklist["GetFrame"] = true
-		RTBlacklist["UpdateDropdown"] = true
-		RTBlacklist["CreateConfiguration"] = true
-		RTBlacklist["CreateButton"] = true
-		RTBlacklist["CreateGroup"] = true
-		RTBlacklist["CreateLabel"] = true
-		RTBlacklist["CreateDropdown"] = true
-		RTBlacklist["CreateColorPicker"] = true
-		RTBlacklist["CreateInput"] = true
-		RTBlacklist["CreateSlider"] = true
-		RTBlacklist["CreateCheckBox"] = true
 	end
 	
 	if( not self.eventFrame ) then
@@ -131,6 +45,8 @@ function RT:PLAYER_ENTERING_WORLD()
 	if( GetCVar( "scriptProfile" ) == "1" ) then
 		ScriptProfiling = true
 	end
+	
+	self.frame:RegisterEvent("PLAYER_LOGOUT")
 end
 
 function RT:PLAYER_LOGOUT()
@@ -139,29 +55,9 @@ function RT:PLAYER_LOGOUT()
 		self.db.enteredName = self.namespaceInput:GetText()
 		self.db.searchEvent = self.eventInput:GetText()
 		
-		if( not self.namespaceSubs:GetChecked() ) then
-			self.db.includeSub = false		
-		else
-			self.db.includeSub = true
-		end
-
-		if( not self.nsHideZero:GetChecked() ) then
-			self.db.hideZeroFuncs = false		
-		else
-			self.db.hideZeroFuncs = true
-		end
-
-		if( not self.evtHideZero:GetChecked() ) then
-			self.db.hideZeroEvents = false		
-		else
-			self.db.hideZeroEvents = true
-		end
-		
-		if( not self.nsHideInject:GetChecked() ) then
-			self.db.hideInjected = false
-		else
-			self.db.hideInjected = true	
-		end
+		self.db.includeSub = self.namespace:GetChecked() and true or false
+		self.db.hideZeroFuncs = self.nsHideZero:GetChecked() and true or false
+		self.db.hideZeroEvents = self.db.profile.hideZeroFuncs
 	end
 end
 
@@ -177,16 +73,16 @@ function RT.OnUpdate(frame, arg1)
 end
 
 function RT:Print(msg)
-	if msg then
+	if( msg ) then
 		ChatFrame1:AddMessage("|cFF33FF99ResourceTools:|r"..tostring(msg))
 	end
 end
 
-function RT:SortOnClick()
-	if( this.sortType ) then
-		if( this.sortType ~= RT.extrasFrame.sortType ) then
+local function sortOnClick(self)
+	if( self.sortType ) then
+		if( self.sortType ~= RT.extrasFrame.sortType ) then
 			RT.extrasFrame.sortOrder = false
-			RT.extrasFrame.sortType = this.sortType
+			RT.extrasFrame.sortType = self.sortType
 		else
 			RT.extrasFrame.sortOrder = not RT.extrasFrame.sortOrder
 		end
@@ -254,8 +150,8 @@ function RT:CreateUI()
 	self.extrasScroll:SetWidth( 160 )
 	self.extrasScroll:SetHeight( 341 )
 	self.extrasScroll:SetPoint( "TOPRIGHT", self.extrasFrame, "TOPRIGHT", -25, -5 )
-	self.extrasScroll:SetScript( "OnVerticalScroll", function()
-		FauxScrollFrame_OnVerticalScroll( 20, RT.UpdateOpenPanel )
+	self.extrasScroll:SetScript( "OnVerticalScroll", function(self, step)
+		FauxScrollFrame_OnVerticalScroll(self, step, 20, RT.UpdateOpenPanel )
 	end )
 
 	FauxScrollFrame_SetOffset( self.extrasScroll, 0 )
@@ -273,9 +169,7 @@ function RT:CreateUI()
 	texture:SetTexCoord( 0.515625, 1.0, 0, 0.4140625 )
 	
 	-- Overall memory/CPU stuff
-	self.overallText = self.frame:CreateFontString( self.frame:GetName() .. "Overall", "BACKGROUND" )
-	self.overallText:SetFont( ( GameFontNormalSmall:GetFont() ), 13 )
-	self.overallText:SetTextColor( 1, 1, 1 )
+	self.overallText = self.frame:CreateFontString( self.frame:GetName() .. "Overall", "BACKGROUND", "GameFontHighlight" )
 	self.overallText:SetPoint( "TOPLEFT", self.frame, "TOPLEFT", 4, -10 )
 	self.overallText:SetText( L["Overall Usage"] )
 	
@@ -284,7 +178,9 @@ function RT:CreateUI()
 	self.overallView:SetText( L["View"] )
 	self.overallView:SetWidth( 75 )
 	self.overallView:SetHeight( 18 )
-	self.overallView:SetFont( ( self.overallView:GetFont() ), 10 )
+	self.overallView:SetNormalFontObject(GameFontHighlightSmall)
+	self.overallView:SetHighlightFontObject(GameFontHighlightSmall)
+	self.overallView:SetDisabledFontObject(GameFontDisableSmall)
 	self.overallView:SetScript( "OnClick", self.ShowOverallUsage )
 	
 	self.overallMemory = self.frame:CreateFontString( self.frame:GetName() .. "OverallMemory", "BACKGROUND" )
@@ -300,8 +196,7 @@ function RT:CreateUI()
 	self.overallEvent:SetPoint( "TOPLEFT", self.overallCPU, "TOPLEFT", 0, -15 )
 	
 	-- Namespace profiling
-	self.namespaceText = self.frame:CreateFontString( self.frame:GetName() .. "Namespace", "BACKGROUND" )
-	self.namespaceText:SetFont( ( GameFontNormalSmall:GetFont() ), 13 )
+	self.namespaceText = self.frame:CreateFontString( self.frame:GetName() .. "Namespace", "BACKGROUND", "GameFontNormal" )
 	self.namespaceText:SetTextColor( 1, 1, 1 )
 	self.namespaceText:SetPoint( "TOPLEFT", self.overallEvent, "TOPLEFT", 0, -36 )
 	self.namespaceText:SetText( L["Namespace Profiling"] )
@@ -311,7 +206,9 @@ function RT:CreateUI()
 	self.namespaceView:SetText( L["View"] )
 	self.namespaceView:SetWidth( 75 )
 	self.namespaceView:SetHeight( 18 )
-	self.namespaceView:SetFont( ( self.namespaceView:GetFont() ), 10 )
+	self.namespaceView:SetNormalFontObject(GameFontHighlightSmall)
+	self.namespaceView:SetHighlightFontObject(GameFontHighlightSmall)
+	self.namespaceView:SetDisabledFontObject(GameFontDisableSmall)
 	self.namespaceView:SetScript( "OnClick", self.ShowNamespaceProfile )
 
 	self.nsSearchText = self.frame:CreateFontString( self.frame:GetName() .. "NSSearchText", "BACKGROUND" )
@@ -325,9 +222,9 @@ function RT:CreateUI()
 	self.nsSearchInput:SetAutoFocus( false )
 	self.nsSearchInput:SetText( self.db.searchName )
 	self.nsSearchInput.blockShow = true
-	self.nsSearchInput:SetScript( "OnTextChanged", function()
-		self:LoadSearchNamespace()
-		self:ShowNamespaceProfile()
+	self.nsSearchInput:SetScript( "OnTextChanged", function(self)
+		RT:LoadNamespace(RT.namespaceInput)
+		RT:ShowNamespaceProfile(self)
 	end )
 	
 	self.nsSearchInput:ClearAllPoints()
@@ -343,9 +240,9 @@ function RT:CreateUI()
 	self.namespaceInput:SetWidth( 150 )
 	self.namespaceInput:SetAutoFocus( false )
 	self.namespaceInput.blockShow = true
-	self.namespaceInput:SetScript( "OnEnterPressed", function()
-		self:LoadNamespace()
-		self:ShowNamespaceProfile()
+	self.namespaceInput:SetScript( "OnEnterPressed", function(self)
+		RT:LoadNamespace(self)
+		RT:ShowNamespaceProfile(self)
 	end )
 	self.namespaceInput:SetText( self.db.enteredName )
 	self.namespaceInput:ClearAllPoints()
@@ -353,45 +250,39 @@ function RT:CreateUI()
 	--self:LoadNamespace()
 	
 	self.namespaceSubs = CreateFrame( "CheckButton", self.frame:GetName() .. "NamespaceSubRout", self.frame, "OptionsCheckButtonTemplate" )
-	self.namespaceSubs:SetHeight( 26 )
-	self.namespaceSubs:SetWidth( 26 )
+	self.namespaceSubs:SetHeight( 24 )
+	self.namespaceSubs:SetWidth( 24 )
 	self.namespaceSubs:SetPoint( "TOPLEFT", self.namespaceName, "TOPLEFT", 0, -20 )
 	self.namespaceSubs.blockShow = self.namespaceSubs:GetChecked()
 	self.namespaceSubs:SetChecked( self.db.includeSub )
-	self.namespaceSubs:SetScript( "OnClick", self.ShowNamespaceProfile )
+	self.namespaceSubs:SetScript( "OnClick", function(self) RT:ShowNamespaceProfile(self) end )
+	getglobal( self.namespaceSubs:GetName() .. "Text" ):SetFontObject(GameFontNormalSmall)
 	getglobal( self.namespaceSubs:GetName() .. "Text" ):SetText( L["Include subroutines"] )
 
 	self.nsHideZero = CreateFrame( "CheckButton", self.frame:GetName() .. "NamespaceNoCall", self.frame, "OptionsCheckButtonTemplate" )
-	self.nsHideZero:SetHeight( 26 )
-	self.nsHideZero:SetWidth( 26 )
+	self.nsHideZero:SetHeight( 24 )
+	self.nsHideZero:SetWidth( 24 )
 	self.nsHideZero:SetPoint( "TOPLEFT", self.namespaceSubs, "TOPLEFT", 0, -20 )
 	self.nsHideZero:SetChecked( self.db.hideZeroFuncs )
 	self.nsHideZero.blockShow = self.nsHideZero:GetChecked()
-	self.nsHideZero:SetScript( "OnClick", self.ShowNamespaceProfile )
+	self.nsHideZero:SetScript( "OnClick", function(self) RT:ShowNamespaceProfile(self) end )
 	getglobal( self.nsHideZero:GetName() .. "Text" ):SetText( L["Hide uncalled functions"] )
+	getglobal( self.nsHideZero:GetName() .. "Text" ):SetFontObject(GameFontNormalSmall)
 
-	self.nsHideInject = CreateFrame( "CheckButton", self.frame:GetName() .. "NamespaceInject", self.frame, "OptionsCheckButtonTemplate" )
-	self.nsHideInject:SetHeight( 26 )
-	self.nsHideInject:SetWidth( 26 )
-	self.nsHideInject:SetPoint( "TOPLEFT", self.nsHideZero, "TOPLEFT", 0, -20 )
-	self.nsHideInject:SetChecked( self.db.hideInjected )
-	self.nsHideInject.blockShow = self.nsHideInject:GetChecked()
-	self.nsHideInject:SetScript( "OnClick", self.ShowNamespaceProfile )
-	getglobal( self.nsHideInject:GetName() .. "Text" ):SetText( L["Hide injected functions"] )
-		
 	-- Event profiling
-	self.eventText = self.frame:CreateFontString( self.frame:GetName() .. "Event", "BACKGROUND" )
-	self.eventText:SetFont( ( GameFontNormalSmall:GetFont() ), 13 )
+	self.eventText = self.frame:CreateFontString( self.frame:GetName() .. "Event", "BACKGROUND", "GameFontNormal")
 	self.eventText:SetTextColor( 1, 1, 1 )
-	self.eventText:SetPoint( "TOPLEFT", self.nsHideInject, "TOPLEFT", 0, -36 )
+	self.eventText:SetPoint( "TOPLEFT", self.nsHideZero, "TOPLEFT", 0, -36 )
 	self.eventText:SetText( L["Event Profiling"] )
 	
 	self.eventView = CreateFrame( "Button", self.frame:GetName() .. "ViewEvent",  self.frame, "UIPanelButtonGrayTemplate" )
-	self.eventView:SetPoint( "TOPRIGHT", self.namespaceView, "TOPRIGHT", 0, -155 )
+	self.eventView:SetPoint( "TOPRIGHT", self.namespaceView, "TOPRIGHT", 0, -135 )
 	self.eventView:SetText( L["View"] )
 	self.eventView:SetWidth( 75 )
 	self.eventView:SetHeight( 18 )
-	self.eventView:SetFont( ( self.eventView:GetFont() ), 10 )
+	self.eventView:SetNormalFontObject(GameFontHighlightSmall)
+	self.eventView:SetHighlightFontObject(GameFontHighlightSmall)
+	self.eventView:SetDisabledFontObject(GameFontDisableSmall)
 	self.eventView:SetScript( "OnClick", self.ShowEventProfile )
 
 	self.eventSearch = self.frame:CreateFontString( self.frame:GetName() .. "EventSearch", "BACKGROUND" )
@@ -405,34 +296,34 @@ function RT:CreateUI()
 	self.eventInput:SetAutoFocus( false )
 	self.eventInput:SetText( self.db.searchEvent )
 	self.eventInput.blockShow = true
-	self.eventInput:SetScript( "OnTextChanged", self.ShowEventProfile )
+	self.eventInput:SetScript( "OnTextChanged", function(self) RT:ShowEventProfile(self) end)
 	self.eventInput:ClearAllPoints()
 	self.eventInput:SetPoint( "BOTTOMRIGHT", self.eventSearch, "TOPRIGHT", 160, -14 )
 	
 	self.evtHideZero = CreateFrame( "CheckButton", self.frame:GetName() .. "EventNoCAll", self.frame, "OptionsCheckButtonTemplate" )
-	self.evtHideZero:SetHeight( 26 )
-	self.evtHideZero:SetWidth( 26 )
+	self.evtHideZero:SetHeight( 24 )
+	self.evtHideZero:SetWidth( 24 )
 	self.evtHideZero:SetPoint( "TOPLEFT", self.eventSearch, "TOPLEFT", 0, -20 )
 	self.evtHideZero:SetChecked( self.db.hideZeroEvents )
 	self.evtHideZero.blockShow = self.evtHideZero:GetChecked()
-	self.evtHideZero:SetScript( "OnClick", self.ShowEventProfile )
+	self.evtHideZero:SetScript( "OnClick", function(self) RT:ShowEventProfile(self) end )
 	getglobal( self.evtHideZero:GetName() .. "Text" ):SetText( L["Hide uncalled events"] )
+	getglobal( self.evtHideZero:GetName() .. "Text" ):SetFontObject(GameFontNormalSmall)
 			
 	-- Basic extras frame
 	local button
 	for i=1, 5 do
 		button = CreateFrame( "Button", self.extrasFrame:GetName() .. "SortButton" .. i, self.extrasFrame )
-		button:SetScript( "OnClick", self.SortOnClick )
+		button:SetScript( "OnClick", sortOnClick )
 		button:SetHeight( 20 )
 		button:SetWidth( 75 )
-		button:SetTextFontObject( GameFontNormal )
+		button:SetNormalFontObject(GameFontNormal)
+		button:SetHighlightFontObject(GameFontNormal)
 	end
 	
 	for i=1, TOTAL_SCROLL_ROWS do
 		for j=1, TOTAL_COLUMNS do
-			text = self.extrasFrame:CreateFontString( self.extrasFrame:GetName() .. "SortRow" .. i .. "Column" .. j, self.extrasFrame )
-			text:SetFont( ( GameFontNormalSmall:GetFont() ), 10 )
-			text:SetTextColor( 1, 1, 1 )
+			text = self.extrasFrame:CreateFontString( self.extrasFrame:GetName() .. "SortRow" .. i .. "Column" .. j, nil, "GameFontHighlightSmall" )
 			text:Hide()
 			
 			if( i > 1 ) then
@@ -492,11 +383,11 @@ end
 
 function RT:UpdateOpenPanel()
 	if( RT.extrasFrame.currentPage == "namespace" ) then
-		RT:ShowNamespaceProfile()
+		RT:ShowNamespaceProfile(self)
 	elseif( RT.extrasFrame.currentPage == "event" ) then
-		RT:ShowEventProfile()
+		RT:ShowEventProfile(self)
 	else
-		RT:ShowOverallUsage()
+		RT:ShowOverallUsage(self)
 	end
 end
 
@@ -506,8 +397,8 @@ function RT:UIError( ... )
 	local column
 	for i=1, select( "#", ... ) do
 		if( i <= TOTAL_SCROLL_ROWS ) then
-			column = getglobal( self.extrasFrame:GetName() .. "SortRow" .. i .. "Column1" )
-			column:SetText( select( i, ... ) )
+			column = getglobal(self.extrasFrame:GetName() .. "SortRow" .. i .. "Column1")
+			column:SetText(select( i, ... ))
 			column:Show()
 		end
 	end
@@ -657,9 +548,9 @@ local function SortGeneric( a, b )
 	end
 end
 
-function RT:ShowNamespaceProfile()
-	if( this.blockShow ) then
-		this.blockShow = nil
+function RT:ShowNamespaceProfile(self)
+	if( self.blockShow ) then
+		self.blockShow = nil
 		return
 	end
 
@@ -728,7 +619,7 @@ function RT:ShowNamespaceProfile()
 	local seconds, called
 
 	for key, value in pairs( namespace ) do
-		if( type( value ) == "function" and ( ( self.nsHideInject:GetChecked() and not RTBlacklist[ key ] ) or not self.nsHideInject:GetChecked() ) and ( ( searchFilter and string.find( key, searchFilter ) ) or not searchFilter ) ) then
+		if( type( value ) == "function" and ( ( searchFilter and string.find( key, searchFilter ) ) or not searchFilter ) ) then
 			seconds, called = GetFunctionCPUUsage( namespace[ key ], self.namespaceSubs:GetChecked() )	
 			
 			if( ( self.nsHideZero:GetChecked() and called > 0 ) or not self.nsHideZero:GetChecked() ) then
@@ -795,9 +686,9 @@ function RT:ShowNamespaceProfile()
 	end
 end
 
-function RT:ShowEventProfile()
-	if( this.blockShow ) then
-		this.blockShow = nil
+function RT:ShowEventProfile(self)
+	if( self.blockShow ) then
+		self.blockShow = nil
 		return
 	end
 	
@@ -1084,8 +975,8 @@ function RT:GetEventCPU( text )
 	end
 end
 
-function RT.LoadNamespace()
-	local namespaceText = string.trim( RT.namespaceInput:GetText() )
+function RT:LoadNamespace(self)
+	local namespaceText = string.trim( self:GetText() )
 	local namespace = getglobal( namespaceText )
 	if( not namespace ) then
 		pcall(function() namespace = loadstring("return "..namespaceText)() end)
@@ -1094,15 +985,53 @@ function RT.LoadNamespace()
 	RT.currNamespaceText = namespaceText
 end
 
-function RT.LoadSearchNamespace()
-	local namespaceText = string.trim( RT.nsSearchInput:GetText() )
-	local namespace = getglobal( namespaceText )
-	if( not namespace ) then
-		pcall(function() namespace = loadstring("return "..namespaceText)() end)
+-- Event handler
+local frame = CreateFrame("Frame")
+frame:RegisterEvent("ADDON_LOADED")
+frame:SetScript("OnEvent", function(frame, event, ...)
+	if( event == "ADDON_LOADED" ) then
+		if( select(1, ...) == "ResourceTools" ) then
+			RT:OnInitialize()
+		end
+		return
 	end
-	RT.currNamespace = namespace
-	RT.currNamespaceText = namespaceText
+	
+	self[event](self,...)
+end)
+
+RT.frame = frame
+
+-- Slash commands
+local cmdPatterns = {
+	["mem (%S+)"] = "GetMemUsage",
+	["ui"] = "ToggleUI",
+	["cpu"] = "ToggleCPU",
+	["reset"] = "ResetCPU",
+	["total (%S+)"] = "GetTotalCPU",
+	["frame (%S+) (%S+)"] = "GetFrameCPU",
+	["func (%S+) (%S+)"] = "GetFunctionCPU",
+	["event (.+)"] = "GetEventCPU",
+}
+
+SLASH_RESOURCETOOLS1 = "/rt"
+SLASH_RESOURCETOOLS2 = "/resourcetools"
+SlashCmdList["RESOURCETOOLS"] = function(cmd)
+	if( cmd ~= "" ) then
+		for regEx, method in pairs(cmdPatterns) do
+			if cmd:match(regEx) then
+				RT[method](RT, cmd:match(regEx))
+				return
+			end
+		end
+	end
+
+	ChatFrame1:AddMessage(L["ResourceTools Slash Commands"])
+	ChatFrame1:AddMessage(L["/rt mem <name> - Lists memory usage of the specified addon"])
+	ChatFrame1:AddMessage(L["/rt ui - Toggles the profiling UI"]  )
+	ChatFrame1:AddMessage(L["/rt cpu - Toggles CPU usage on and off"] )
+	ChatFrame1:AddMessage(L["/rt reset - Resets CPU stats"] )
+	ChatFrame1:AddMessage(L["/rt total <addon> - Total CPU usage of the specified addon"] )
+	ChatFrame1:AddMessage(L["/rt frame <name> <true/false> - CPU usage on the specified frame, second argument is to include children"])
+	ChatFrame1:AddMessage(L["/rt func <name> <true/false> - CPU usage on the specified function, second argument is to include subroutines."])
+	ChatFrame1:AddMessage(L["/rt event <name> or all - Event names to register CPU usage for, you can specify multiple ones with a comma, or use \"all\" for a total based on all events."] )
 end
-
-
-RT:Load()
