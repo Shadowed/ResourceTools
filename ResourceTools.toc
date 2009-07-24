@@ -1,11 +1,8 @@
-## Interface: 30000
+## Interface: 30100
 ## Title: Resource Tools
 ## Notes: Addon for developers to assist with profiling addons
 ## SavedVariables: ResourceToolsDB, RTEvents
 
 localization.enUS.lua
-localization.deDE.lua
-localization.frFR.lua
 
-blacklist.lua
 ResourceTools.lua
