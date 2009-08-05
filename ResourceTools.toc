@@ -1,6 +1,8 @@
-## Interface: 30100
+## Interface: 30200
 ## Title: Resource Tools
 ## Notes: Addon for developers to assist with profiling addons
+## LoadManagers: AddonLoader
+## X-LoadOn-Slash: /resourcetools, /rt
 ## SavedVariables: ResourceToolsDB, RTEvents
 
 localization.enUS.lua
