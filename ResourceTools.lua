@@ -55,9 +55,9 @@ function RT:PLAYER_LOGOUT()
 		self.db.searchName = self.nsSearchInput:GetText()
 		self.db.enteredName = self.namespaceInput:GetText()
 		self.db.searchEvent = self.eventInput:GetText()
-		
+		self.db.includeSub = self.namespaceSubs:GetChecked() and true or false
 		self.db.hideZeroFuncs = self.nsHideZero:GetChecked() and true or false
-		self.db.hideZeroEvents = self.db.profile.hideZeroFuncs
+		self.db.hideZeroEvents = self.evtHideZero:GetChecked() and true or false
 	end
 end
 
