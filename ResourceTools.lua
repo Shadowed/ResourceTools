@@ -48,8 +48,6 @@ function RT:OnInitialize()
 	if( GetCVar("scriptProfile") == "1" ) then
 		ScriptProfiling = true
 	end
-	
-	self.frame:RegisterEvent("PLAYER_LOGOUT")
 end
 
 function RT:PLAYER_LOGOUT()
@@ -58,7 +56,6 @@ function RT:PLAYER_LOGOUT()
 		self.db.enteredName = self.namespaceInput:GetText()
 		self.db.searchEvent = self.eventInput:GetText()
 		
-		self.db.includeSub = self.namespace:GetChecked() and true or false
 		self.db.hideZeroFuncs = self.nsHideZero:GetChecked() and true or false
 		self.db.hideZeroEvents = self.db.profile.hideZeroFuncs
 	end
@@ -106,7 +103,7 @@ function RT:ToggleUI()
 end
 
 function RT:CreateUI()
-	if( self.frame.initialized ) then
+	if( self.frame ) then
 		return
 	end
 	
@@ -326,7 +323,7 @@ function RT:CreateUI()
 	
 	for i=1, TOTAL_SCROLL_ROWS do
 		for j=1, TOTAL_COLUMNS do
-			text = self.extrasFrame:CreateFontString(self.extrasFrame:GetName() .. "SortRow" .. i .. "Column" .. j, nil, "GameFontHighlightSmall")
+			local text = self.extrasFrame:CreateFontString(self.extrasFrame:GetName() .. "SortRow" .. i .. "Column" .. j, nil, "GameFontHighlightSmall")
 			text:Hide()
 			
 			if( i > 1 ) then
@@ -355,15 +352,15 @@ function RT:UpdateUI()
 		totalMem = totalMem + (GetAddOnMemoryUsage(i) )
 	end
 
-	if( totalMem > 1000 ) then
-		self.overallMemory:SetText(string.format(L["Memory: %s"], string.format(L["%.2f MB"], totalMem / 1000) ))
+	if( totalMem > 1024 ) then
+		self.overallMemory:SetFormattedText(L["Memory: %.2f MiB"], totalMem / 1024)
 	else
-		self.overallMemory:SetText(string.format(L["Memory: %s"], string.format(L["%.2f KB"], totalMem / 1000) ))
+		self.overallMemory:SetFormattedText(L["Memory: %.2f KiB"], totalMem)
 	end
 
 	if( ScriptProfiling ) then
-		self.overallCPU:SetText(string.format(L["CPU: %.3f seconds"], GetScriptCPUUsage()) )
-		self.overallEvent:SetText(string.format(L["All Events: %.3f seconds, called %d"], GetEventCPUUsage()) )
+		self.overallCPU:SetFormattedText(L["CPU: %.3f seconds"], GetScriptCPUUsage() / 1000)
+		self.overallEvent:SetFormattedText(L["All Events: %.3f seconds"], GetEventCPUUsage() / 1000)
 	elseif( GetCVar("scriptProfile") == "1" and not ScriptProfiling ) then
 		self.overallCPU:SetText(L["CPU: UI reload needed"])
 		self.overallEvent:SetText(L["All Events: UI reload needed"])
@@ -475,8 +472,8 @@ function RT:ShowOverallUsage()
 	local addonList = {}
 	for i=1, GetNumAddOns() do
 		if( IsAddOnLoaded(i)  ) then
-			memory = GetAddOnMemoryUsage(i)
-			cpu = GetAddOnCPUUsage(i)
+			local memory = GetAddOnMemoryUsage(i)
+			local cpu = GetAddOnCPUUsage(i)
 			
 			table.insert(addonList, { name = (GetAddOnInfo(i) ), memory = memory, cpu = cpu, cpuPerct = cpu / totalCPU * 100, memPerct = memory / totalMem * 100 })
 		end
@@ -500,15 +497,15 @@ function RT:ShowOverallUsage()
 			
 			column1:SetText(addonList[index].name)
 			if( ScriptProfiling ) then
-				column3:SetText(string.format(L["%.2f (%.1f%%)"], addonList[index].cpu, addonList[index].cpuPerct) )
+				column3:SetFormattedText(L["%.2f (%.1f%%)"], addonList[index].cpu / 1000, addonList[index].cpuPerct)
 			else
 				column3:SetText("----")
 			end
 			
-			if( addonList[index].memory > 1000 ) then
-				column2:SetText(string.format(L["%.2f MB (%.1f%%)"], addonList[index].memory / 1000, addonList[index].memPerct) )
+			if( addonList[index].memory > 1024 ) then
+				column2:SetFormattedText(L["%.2f MiB (%.1f%%)"], addonList[index].memory / 1024, addonList[index].memPerct)
 			else
-				column2:SetText(string.format(L["%.2f KB (%.1f%%)"], addonList[index].memory, addonList[index].memPerct) )
+				column2:SetFormattedText(L["%.2f KiB (%.1f%%)"], addonList[index].memory, addonList[index].memPerct)
 			end
 			
 			column1:Show()
@@ -655,10 +652,10 @@ function RT:ShowNamespaceProfile(self)
 	for i=1, TOTAL_SCROLL_ROWS do
 		index = offset + i
 		
-		column1 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column1"]
-		column2 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column2"]
-		column3 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column3"]
-		column4 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column4"]
+		local column1 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column1"]
+		local column2 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column2"]
+		local column3 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column3"]
+		local column4 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column4"]
 		
 		if( index <= #(funcList)  ) then
 			if( string.len(funcList[index].name) >= 36 ) then
@@ -669,8 +666,8 @@ function RT:ShowNamespaceProfile(self)
 			column4:SetText(funcList[index].called)
 			
 			if( funcList[index].called > 0 ) then
-				column2:SetText(string.format(L["%.2f (%.1f%%)"], funcList[index].seconds, funcList[index].secondsPerct) )
-				column3:SetText(string.format("%.2f", funcList[index].avgSeconds) )
+				column2:SetFormattedText(L["%.2f (%.1f%%)"], funcList[index].seconds, funcList[index].secondsPerct)
+				column3:SetFormattedText("%.2f", funcList[index].avgSeconds)
 			else
 				column2:SetText("----")
 				column3:SetText("----")
@@ -785,10 +782,10 @@ function RT:ShowEventProfile(self)
 	for i=1, TOTAL_SCROLL_ROWS do
 		index = offset + i
 		
-		column1 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column1"]
-		column2 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column2"]
-		column3 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column3"]
-		column4 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column4"]
+		local column1 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column1"]
+		local column2 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column2"]
+		local column3 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column3"]
+		local column4 = _G[self.extrasFrame:GetName() .. "SortRow" .. i .. "Column4"]
 		
 		if( index <= #(eventList)  ) then
 			if( string.len(eventList[index].name) >= 30 ) then
@@ -805,8 +802,8 @@ function RT:ShowEventProfile(self)
 			column4:SetText(eventList[index].called)
 
 			if( eventList[index].called > 0 ) then
-				column2:SetText(string.format(L["%.2f (%.1f%%)"], eventList[index].seconds, eventList[index].secondsPerct) )
-				column3:SetText(string.format("%.2f", eventList[index].avgSeconds) )
+				column2:SetFormattedText(L["%.2f (%.1f%%)"], eventList[index].seconds, eventList[index].secondsPerct)
+				column3:SetFormattedText("%.2f", eventList[index].avgSeconds)
 			else
 				column2:SetText("----")
 				column3:SetText("----")
@@ -829,10 +826,10 @@ function RT:GetMemUsage(addon)
 	UpdateAddOnMemoryUsage()
 	local usedKB = GetAddOnMemoryUsage(addon)
 	
-	if( usedKB > 1000 ) then
-		self:Print(string.format(L["%s is using %s memory."], addon, string.format(L["%.2f MB"], usedKB / 1000) ))
+	if( usedKB > 1024 ) then
+		self:Print(string.format(L["%s is using %.2f MiB memory."], addon, usedKB / 1024))
 	else
-		self:Print(string.format(L["%s is using %s memory."], addon, string.format(L["%.2f KB"], usedKB) ))
+		self:Print(string.format(L["%s is using %.2f KiB memory."], addon, usedKB))
 	end
 end
 
@@ -991,7 +988,8 @@ end
 -- Event handler
 local frame = CreateFrame("Frame")
 frame:RegisterEvent("ADDON_LOADED")
-frame:SetScript("OnEvent", function(frame, event, ...)
+frame:RegisterEvent("PLAYER_LOGOUT")
+frame:SetScript("OnEvent", function(self, event, ...)
 	if( event == "ADDON_LOADED" ) then
 		if( select(1, ...) == "ResourceTools" ) then
 			RT:OnInitialize()
@@ -1000,10 +998,8 @@ frame:SetScript("OnEvent", function(frame, event, ...)
 		return
 	end
 	
-	self[event](RT, ...)
+	RT[event](RT, ...)
 end)
-
-RT.frame = frame
 
 -- Slash commands
 local cmdPatterns = {
@@ -1016,6 +1012,9 @@ local cmdPatterns = {
 	["func (%S+) (%S+)"] = "GetFunctionCPU",
 	["event (.+)"] = "GetEventCPU",
 }
+
+SLASH_RT1 = nil
+SlashCmdList["RT"] = nil
 
 SLASH_RESOURCETOOLS1 = "/rt"
 SLASH_RESOURCETOOLS2 = "/resourcetools"
